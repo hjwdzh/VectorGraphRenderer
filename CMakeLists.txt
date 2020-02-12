@@ -38,6 +38,10 @@ set(
     VectorRender_SRC
     src/main.cc
     src/types.h
+    src/arrangement.cc
+    src/arrangement.h
+    src/divide_conquer_construct.cc
+    src/divide_conquer_construct.h
     src/plane_param.cc
     src/plane_param.h
     src/split_data.cc
