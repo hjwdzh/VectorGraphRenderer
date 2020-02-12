@@ -37,6 +37,7 @@ include_directories(${CGAL_INCLUDE_DIRS})
 set(
     VectorRender_SRC
     src/main.cc
+    src/types.h
 )
 
 add_executable(

@@ -11,24 +11,8 @@
 #include <set>
 #include <unordered_set>
 #include <chrono>
-struct combine_indices
-{
-long long operator()( const long long& lhs, const long long& rhs ) const {
-	return lhs * ((long long)(1 << 16)) * ((long long)(1 << 16)) + rhs;
-}
-};
 
-typedef CGAL::Exact_rational									K;
-typedef CGAL::Cartesian<K>                   Kernel;
-typedef CGAL::Arr_segment_traits_2<Kernel>                      Traits_2;
-typedef Traits_2::Point_2                                       Point_2;
-typedef Traits_2::X_monotone_curve_2                            Segment_2;
-typedef CGAL::Arr_face_extended_dcel<Traits_2, long long>            Dcel;
-typedef CGAL::Arrangement_2<Traits_2, Dcel>                     Arrangement_2;
-typedef CGAL::Arr_face_overlay_traits<Arrangement_2,
-                                      Arrangement_2,
-                                      Arrangement_2,
-                                      combine_indices >  Overlay_traits;
+#include "types.h"
 
 #define THRES 1e-10
 inline bool equal(double a, double b) {
