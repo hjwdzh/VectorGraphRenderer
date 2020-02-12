@@ -16,26 +16,6 @@
 #include "divide_conquer_construct.h"
 #include "plane_param.h"
 
-
-void ComputeArrangement(std::vector<Eigen::Vector3d>& vertices,
-	std::vector<Eigen::Vector3i>& faces,
-	std::vector<PlaneParam>& plane_params,
-	int start, int end, Arrangement_2& overlay) {
-	printf("<%d %d>\n", start, end);
-	if (start == end) {
-		ComputeTriangleArrangement(vertices, faces[start], start, &overlay);
-	}
-	else {
-		//printf("<%d %d>\n", start, end);
-		Arrangement_2 overlay1, overlay2;
-		int m = (start + end) / 2;
-		ComputeArrangement(vertices, faces, plane_params, start, m, overlay1);
-		ComputeArrangement(vertices, faces, plane_params, m + 1, end, overlay2);
-		MergeArrangement(overlay1, overlay2, vertices, faces, plane_params, &overlay);
-	}
-	printf("finish <%d %d>\n", start, end);
-}
-
 void Clamp(std::vector<Eigen::Vector3d>& vertices, std::vector<Eigen::Vector3i>& faces, std::vector<Eigen::Vector3d>& face_normals, int dim, double thres, int comp) {
 	int i = 0;
 	int faces_num = faces.size();
@@ -215,7 +195,7 @@ int main (int argc, char** argv)
 		params[i] = PlaneParam(vertices[faces[i][0]],vertices[faces[i][1]],vertices[faces[i][2]]);
 	}
 
-	ComputeArrangement(vertices, faces, params, 0, faces.size() - 1, overlay);
+	ConstructArrangement(vertices, faces, params, 0, faces.size() - 1, &overlay);
 	printf("Done...\n");
 
 	auto compute_z = [&](int id1, double x, double y) {

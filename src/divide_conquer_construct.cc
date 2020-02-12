@@ -1,7 +1,28 @@
 #include "divide_conquer_construct.h"
 
+#include <unordered_map>
+
 #include "arrangement.h"
 #include "split_data.h"
+
+void ConstructArrangement(const std::vector<Eigen::Vector3d>& vertices,
+	const std::vector<Eigen::Vector3i>& faces,
+	const std::vector<PlaneParam>& plane_params,
+	int start, int end, Arrangement_2* overlay) {
+	printf("<%d %d>\n", start, end);
+	if (start == end) {
+		ComputeTriangleArrangement(vertices, faces[start], start, overlay);
+	}
+	else {
+		//printf("<%d %d>\n", start, end);
+		Arrangement_2 overlay1, overlay2;
+		int m = (start + end) / 2;
+		ConstructArrangement(vertices, faces, plane_params, start, m, &overlay1);
+		ConstructArrangement(vertices, faces, plane_params, m + 1, end, &overlay2);
+		MergeArrangement(overlay1, overlay2, vertices, faces, plane_params, overlay);
+	}
+	printf("finish <%d %d>\n", start, end);
+}
 
 void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
 	const std::vector<Eigen::Vector3d>& vertices,
@@ -22,25 +43,12 @@ void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
 		return param.compute_z(p);
 	};
 
-	auto check_edges = [&]() {
-		int invalid_count = 0;
-		for (auto e = out.halfedges_begin(); e != out.halfedges_end(); ++e) {
-			if (e->face() == out.unbounded_face())
-				continue;
-			if (e->face() == e->twin()->face()) {
-				invalid_count += 1;
-			}
-		}
-		return invalid_count;
-	};
-
-	//printf("Merge Overlay 1!\n");
 	std::vector<std::vector<SplitData> > splits;
 	std::unordered_set<Arrangement_2::Halfedge_handle> halfedges;
 	for (auto e = out.halfedges_begin(); e != out.halfedges_end(); ++e) {
 		halfedges.insert(e);
 	}
-	auto t1 = std::chrono::steady_clock::now();
+
 	for (auto fit = out.faces_begin(); fit != out.faces_end(); ++fit) {
 		if (fit == out.unbounded_face())
 			continue;
@@ -115,10 +123,6 @@ void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
 					if (split_points[j].e->twin()->face() == split_points[j+1].e->twin()->face()) {
 						split_points[j+1].e = split_points[j+1].e->twin();
 					}
-					if (split_points[j].e->twin()->face() != split_points[j+1].e->face()) {
-						printf("Unable to pair!\n");
-						exit(0);
-					}
 				}
 
 				for (int j = 0; j < split_points.size(); j += 2)
@@ -126,28 +130,10 @@ void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
 
 				splits.push_back(split_points);
 			}			
-			if (split_points.size() % 2 != 0) {
-				printf("...... %d\n", split_points.size());
-				exit(0);
-			}
 		}
 	}
 
-	/*
-	for (int i = 0; i < splits.size(); ++i) {
-		int top = 0;
-		for (int j = 0; j < splits[i].size(); j += 2) {
-			if (!splits[i][j].trivial || !splits[i][j + 1].trivial) {
-				splits[i][top++] = splits[i][j];
-				splits[i][top++] = splits[i][j + 1];
-			}
-		}
-		splits[i].resize(top);
-	}
-	*/
-	auto t2 = std::chrono::steady_clock::now();
-
-	std::map<Arrangement_2::Halfedge_handle, std::vector<std::pair<int, int> > > edge_handles;
+	std::unordered_map<Arrangement_2::Halfedge_handle, std::vector<std::pair<int, int> > > edge_handles;
 	for (int i = 0; i < splits.size(); ++i) {
 		for (int j = 0; j < splits[i].size(); ++j) {
 			auto it = edge_handles.find(splits[i][j].e);
@@ -167,12 +153,7 @@ void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
 		}
 	}
 
-	auto t3 = std::chrono::steady_clock::now();
 
-
-	//printf("================================\n");
-	//std::ofstream os;
-	//os.open("split_point.obj");
 	for (auto& info : edge_handles) {
 		auto p = info.first->source()->point();
 		std::vector<std::pair<K, int> > dis(info.second.size());
@@ -215,46 +196,18 @@ void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
 			Segment_2 s1(e_handle->source()->point(), split_point);
 			Segment_2 s2(split_point, e_handle->target()->point());
 
-			//os << "v " << split_point.x().convert_to<double>() << " " << split_point.y().convert_to<double>() << " 0\n";
 			e_handle = out.split_edge(e_handle, s1, s2);
 			splits[e.first][e.second].v = e_handle->target();
-			/*
-			if (vid.count(e_handle->target()) == 0) {
-				int n = vid.size();
-				vid[e_handle->target()] = n;
-				printf("New splits %d %d\n", vid.size(), i);
-			}
-			*/
 		}
 		for (int i = 1; i < dis.size(); ++i) {
 			if ((dis[i].first == dis[i - 1].first)) {
 				auto e1 = info.second[dis[i - 1].second];
 				auto e = info.second[dis[i].second];
-				//printf("Skip %d\n", i);
 				splits[e.first][e.second].v = splits[e1.first][e1.second].v;
 			}
 		}
 	}
 
-	auto t4 = std::chrono::steady_clock::now();
-	/*
-	os.close();
-
-	int invalid_count = check_edges();
-	if (invalid_count > 0) {
-		exit(0);
-	}
-
-	for (int i = 0; i < splits.size(); ++i) {
-		for (int j = 0; j < splits[i].size(); ++j) {
-			auto& p = splits[i][j];
-			printf("<%d %d %d>\n", vid[splits[i][j].v1], vid[splits[i][j].v2], vid[splits[i][j].v]);
-		}
-	}
-	//Count(out);
-	//printf("Merge Overlay 2!\n");
-	os.open("split_new_edge.obj");
-	*/
 	for (int i = 0; i < splits.size(); ++i) {
 		auto& points = splits[i];
 		for (int j = 0; j < points.size(); j += 2) {
@@ -266,15 +219,7 @@ void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
 			}
 		}
 	}
-	auto t5 = std::chrono::steady_clock::now();
-	/*
-	for (int i = 0; i < count; ++i) {
-		os << "l " << i * 2 + 1 << " " << i * 2 + 2 << "\n";
-	}
-	os.close();
-	*/
-	//Count(out);
-	//printf("Merge Overlay 3!\n");
+
 	for (auto fit = out.faces_begin(); fit != out.faces_end(); ++fit) {
 		if (fit == out.unbounded_face())
 			continue;
@@ -290,7 +235,6 @@ void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
 		}
 		else {
 			Arrangement_2::Ccb_halfedge_circulator curr = fit->outer_ccb();
-			K min_k = K(100), max_k = K(-100);
 			int selected = -1;
 			do {
 				Arrangement_2::Halfedge_handle he = curr;
@@ -314,23 +258,5 @@ void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
 		}
 	}
 
-	auto t6 = std::chrono::steady_clock::now();
-	//printf("Merge Overlay 4!\n");
-	//printf("OK1!\n");
-
-	//Count(out);
 	MergeFaceInsideArrangement(out);
-	auto t7 = std::chrono::steady_clock::now();
-
-	//printf("OK2!\n");
-	//printf("Merge Overlay Done!\n");
-	//Count(out);
-
-	auto diff1 = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count();
-	auto diff2 = std::chrono::duration_cast<std::chrono::nanoseconds>(t3 - t2).count();
-	auto diff3 = std::chrono::duration_cast<std::chrono::nanoseconds>(t4 - t3).count();
-	auto diff4 = std::chrono::duration_cast<std::chrono::nanoseconds>(t5 - t4).count();
-	auto diff5 = std::chrono::duration_cast<std::chrono::nanoseconds>(t6 - t5).count();
-	auto diff6 = std::chrono::duration_cast<std::chrono::nanoseconds>(t7 - t6).count();
-	std::cout << diff1 << " " << diff2 << " " << diff3 << " " << diff4 << " " << diff5 << " " << diff6 << "\n";
 }
