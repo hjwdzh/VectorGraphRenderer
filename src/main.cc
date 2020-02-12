@@ -13,54 +13,7 @@
 #include <chrono>
 
 #include "plane_param.h"
-
-struct SplitData
-{
-	SplitData()
-	{
-		//printf("Interesting....\n");
-		//exit(0);
-	}
-	SplitData(Arrangement_2::Halfedge_handle _e, K dis1, K dis2) {
-		e = _e;
-
-		K ratio1 = dis2 / (dis2 - dis1);
-		K ratio2 = -dis1 / (dis2 - dis1);
-
-		split_point = Point_2(e->source()->point().x() * ratio1 + e->target()->point().x() * ratio2,
-			e->source()->point().y() * ratio1 + e->target()->point().y() * ratio2);
-		
-		auto p1 = e->source()->point();
-		auto p2 = e->target()->point();
-		auto split_point = e->source()->point();
-
-		/*
-		printf("<%f %f> <%f %f> <%f %f>\n",
-			p1.x().convert_to<double>(),p1.y().convert_to<double>(),
-			p2.x().convert_to<double>(),p2.y().convert_to<double>(),
-			split_point.x().convert_to<double>(),split_point.y().convert_to<double>());
-		*/
-		if (split_point == e->source()->point() || split_point == e->target()->point())
-			trivial = true;
-		else
-			trivial = false;
-		v1 = e->source();
-		v2 = e->target();
-		v = Arrangement_2::Vertex_handle();
-	}
-	Arrangement_2::Halfedge_handle e;
-	Arrangement_2::Vertex_handle v, v1, v2;
-	long long fid;
-	Point_2 split_point;
-	bool trivial;
-
-	K signature() const {
-		return K(0.3245) * split_point.x() + K(0.6842) * split_point.y();
-	}
-	bool operator<(const SplitData& n) const {
-		return signature() < n.signature();
-	}
-};
+#include "split_data.h"
 
 void ComputeTriangleOverlay(const std::vector<Eigen::Vector3d>& vertices, const Eigen::Vector3i& f, int fid, Arrangement_2& out) {
 	out = Arrangement_2();

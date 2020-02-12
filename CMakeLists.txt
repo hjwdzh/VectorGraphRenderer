@@ -40,6 +40,8 @@ set(
     src/types.h
     src/plane_param.cc
     src/plane_param.h
+    src/split_data.cc
+    src/split_data.h
 )
 
 add_executable(
