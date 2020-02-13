@@ -2,13 +2,17 @@
 
 #include <unordered_set>
 
-void ComputeTriangleArrangement(const std::vector<Eigen::Vector3d>& vertices, const Eigen::Vector3i& f, int fid, Arrangement_2* pout) {
+void ComputeTriangleArrangement(const Mesh& mesh, int fid, Arrangement_2* pout) {
 	*pout = Arrangement_2();
 	auto& out = *pout;
 	
-	Eigen::Vector3d v1 = vertices[f[0]];
-	Eigen::Vector3d v2 = vertices[f[1]];
-	Eigen::Vector3d v3 = vertices[f[2]];
+	auto& vertices = mesh.GetVertices();
+	auto& faces = mesh.GetFaces();
+	auto f = faces[fid];
+
+	const Eigen::Vector3d& v1 = vertices[f[0]];
+	const Eigen::Vector3d& v2 = vertices[f[1]];
+	const Eigen::Vector3d& v3 = vertices[f[2]];
 
 	auto off1 = v2 - v1;
 	auto off2 = v3 - v1;

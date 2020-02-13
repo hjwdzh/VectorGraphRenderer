@@ -40,8 +40,12 @@ set(
     src/types.h
     src/arrangement.cc
     src/arrangement.h
+    src/camera.cc
+    src/camera.h
     src/divide_conquer_construct.cc
     src/divide_conquer_construct.h
+    src/mesh.cc
+    src/mesh.h
     src/plane_param.cc
     src/plane_param.h
     src/split_data.cc

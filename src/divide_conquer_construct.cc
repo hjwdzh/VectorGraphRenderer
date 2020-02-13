@@ -5,35 +5,32 @@
 #include "arrangement.h"
 #include "split_data.h"
 
-void ConstructArrangement(const std::vector<Eigen::Vector3d>& vertices,
-	const std::vector<Eigen::Vector3i>& faces,
-	const std::vector<PlaneParam>& plane_params,
+void ConstructArrangement(const Mesh& mesh,
 	int start, int end, Arrangement_2* overlay) {
 	printf("<%d %d>\n", start, end);
 	if (start == end) {
-		ComputeTriangleArrangement(vertices, faces[start], start, overlay);
+		ComputeTriangleArrangement(mesh, start, overlay);
 	}
 	else {
 		//printf("<%d %d>\n", start, end);
 		Arrangement_2 overlay1, overlay2;
 		int m = (start + end) / 2;
-		ConstructArrangement(vertices, faces, plane_params, start, m, &overlay1);
-		ConstructArrangement(vertices, faces, plane_params, m + 1, end, &overlay2);
-		MergeArrangement(overlay1, overlay2, vertices, faces, plane_params, overlay);
+		ConstructArrangement(mesh, start, m, &overlay1);
+		ConstructArrangement(mesh, m + 1, end, &overlay2);
+		MergeArrangement(overlay1, overlay2, mesh, overlay);
 	}
 	printf("finish <%d %d>\n", start, end);
 }
 
 void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
-	const std::vector<Eigen::Vector3d>& vertices,
-	const std::vector<Eigen::Vector3i>& faces,
-	const std::vector<PlaneParam>& plane_params,
+	const Mesh& mesh,
 	Arrangement_2* pout) {
 
 	Overlay_traits         overlay_traits;
 	overlay (arr1, arr2, *pout, overlay_traits);
 
 	auto& out = *pout;
+	auto& plane_params = mesh.GetPlanes();
 
 	std::vector<std::vector<SplitData> > splits;
 	std::unordered_set<Arrangement_2::Halfedge_handle> halfedges;
@@ -51,9 +48,9 @@ void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
 		if (id1 != -1 && id2 != -1) {
 			std::vector<SplitData> split_points;
 
-			CollectSelfIntersection(fit->outer_ccb(), id1, id2, halfedges, plane_params, &split_points);
+			CollectSelfIntersection((Arrangement_2::Ccb_halfedge_circulator)fit->outer_ccb(), id1, id2, halfedges, plane_params, &split_points);
 			for (auto hi = fit->holes_begin(); hi != fit->holes_end(); ++hi) {
-				auto circ = *hi;
+				Arrangement_2::Ccb_halfedge_circulator circ = *hi;
 				CollectSelfIntersection(circ, id1, id2, halfedges, plane_params, &split_points);
 			}
 

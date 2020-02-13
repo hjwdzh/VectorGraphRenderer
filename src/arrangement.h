@@ -5,9 +5,10 @@
 
 #include <Eigen/Core>
 
+#include "mesh.h"
 #include "types.h"
 
-void ComputeTriangleArrangement(const std::vector<Eigen::Vector3d>& vertices, const Eigen::Vector3i& f, int fid, Arrangement_2* pout);
+void ComputeTriangleArrangement(const Mesh& mesh, int fid, Arrangement_2* pout);
 
 void MergeFaceInsideArrangement(Arrangement_2& out);
 

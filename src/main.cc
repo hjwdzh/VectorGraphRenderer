@@ -13,6 +13,8 @@
 #include <chrono>
 
 #include "arrangement.h"
+#include "camera.h"
+#include "mesh.h"
 #include "divide_conquer_construct.h"
 #include "plane_param.h"
 
@@ -90,113 +92,29 @@ void Clamp(std::vector<Eigen::Vector3d>& vertices, std::vector<Eigen::Vector3i>&
 
 int main (int argc, char** argv)
 {
-	std::ifstream is(argv[1]);
-	char buffer[1024];
-	std::vector<Eigen::Vector3d> vertices;
-	std::vector<Eigen::Vector3d> face_normals;
-	std::vector<Eigen::Vector3i> faces;
+	Mesh mesh;
+	Camera camera;
+	mesh.LoadFromFile(argv[1]);
+	camera.LoadFromFile(argv[2]);
+	camera.ApplyExtrinsic(mesh);
+	mesh.BoundaryClip(2, 1e-2, 0);
+	camera.ApplyIntrinsic(mesh);
+	mesh.BoundaryClip(0, 0, 0);
+	mesh.BoundaryClip(1, 0, 0);
+	mesh.BoundaryClip(0, 1, 1);
+	mesh.BoundaryClip(1, 1, 1);
 
-	while (is >> buffer) {
-		if (strcmp(buffer, "v") == 0) {
-			Eigen::Vector3d v;
-			is >> v[0] >> v[1] >> v[2];
-			vertices.push_back(v);
-		}
-		else if (strcmp(buffer, "f") == 0) {
-			Eigen::Vector3i f;
-			for (int i = 0; i < 3; ++i) {
-				is >> buffer;
-				int t = 0;
-				int p = 0;
-				int l = strlen(buffer);
-				while (p != l && buffer[p] >= '0' && buffer[p] <= '9') {
-					t = t * 10 + (buffer[p] - '0');
-					p += 1;
-				}
-				f[i] = t - 1;
-			}
-			faces.push_back(f);
-		}
-	}
-	is.close();
+	mesh.ComputeNormals();
+	mesh.ComputePlaneParameters();
 
-	is.open(argv[2]);
-
-	Eigen::Matrix4d world2cam;
-
-	int width, height;
-	double fx, fy, cx, cy;
-	double angle;
-	is >> height >> width;
-	is >> fx >> fy >> cx >> cy;
-
-	for (int i = 0; i < 4; ++i) {
-		for (int j = 0; j < 4; ++j) {
-			is >> world2cam(i, j);
-		}
-	}
-	is >> angle;
-
-
-	for (int i = 0; i < vertices.size(); ++i) {
-		Eigen::Vector4d v(vertices[i][0], vertices[i][1], vertices[i][2], 1);
-		v = world2cam * v;
-		vertices[i] = Eigen::Vector3d(v[0],v[1],v[2]);
-	}
-
-	face_normals.resize(faces.size());
-	for (int i = 0; i < faces.size(); ++i) {
-		Eigen::Vector3d d1 = vertices[faces[i][1]] - vertices[faces[i][0]];
-		Eigen::Vector3d d2 = vertices[faces[i][2]] - vertices[faces[i][0]];
-		Eigen::Vector3d n = d1.cross(d2);
-		if (n.norm() > 0)
-			n = n.normalized();
-		face_normals[i] = n;
-	}
-
-	Clamp(vertices, faces, face_normals, 2, 1e-2, 0);
-	std::vector<Eigen::Vector3d> vertices0 = vertices;
-
-	for (int i = 0; i < vertices.size(); ++i) {
-		Eigen::Vector3d v = vertices[i];
-		if (v[2] != 0) {
-			vertices[i] = Eigen::Vector3d((v[0]/v[2]*fx+cx)/width,
-				(v[1]/v[2]*fy+cy)/height,v[2]);
-		} else {
-			vertices[i] = Eigen::Vector3d(0, 0, 0);
-		}
-	}
-
-	Clamp(vertices, faces, face_normals, 0, 0, 0);
-	Clamp(vertices, faces, face_normals, 1, 0, 0);
-	Clamp(vertices, faces, face_normals, 0, 1, 1);
-	Clamp(vertices, faces, face_normals, 1, 1, 1);
-
-	std::vector<int> source_face_indices(faces.size());
-	for (int i = 0; i < faces.size(); ++i)
-		source_face_indices[i] = i;
-	//SelfIntersection(vertices, faces, source_face_indices);
-
-	face_normals.resize(faces.size());
-	for (int i = 0; i < faces.size(); ++i) {
-		Eigen::Vector3d d1 = vertices[faces[i][1]] - vertices[faces[i][0]];
-		Eigen::Vector3d d2 = vertices[faces[i][2]] - vertices[faces[i][0]];
-		Eigen::Vector3d n = d1.cross(d2);
-		if (n.norm() > 0)
-			n = n.normalized();
-		face_normals[i] = n;
-	}
+	auto& vertices= mesh.GetVertices();
+	auto& faces = mesh.GetFaces();
+	auto& params = mesh.GetPlanes();
+	auto& face_normals = mesh.GetFaceNormals();
 
 	Arrangement_2 overlay;
 
-	printf("Overlay...\n");
-	std::vector<PlaneParam> params(faces.size());
-	for (int i = 0; i < faces.size(); ++i) {
-		params[i] = PlaneParam(vertices[faces[i][0]],vertices[faces[i][1]],vertices[faces[i][2]]);
-	}
-
-	ConstructArrangement(vertices, faces, params, 0, faces.size() - 1, &overlay);
-	printf("Done...\n");
+	ConstructArrangement(mesh, 0, mesh.FaceNum() - 1, &overlay);
 
 	auto compute_z = [&](int id1, double x, double y) {
 		Eigen::Vector3d v0 = vertices[faces[id1][0]];
@@ -213,19 +131,6 @@ int main (int argc, char** argv)
 		return z;
 	};
 	
-	int detected_deletion = 0;
-	for (auto v = overlay.vertices_begin(); v != overlay.vertices_end(); ++v) {
-		auto e1 = v->incident_halfedges();
-		auto e2 = e1;
-		int c = 0;
-		do {
-			c += 1;
-		} while (e2 != e1);
-		if (c == 2) {
-			detected_deletion += 1;
-		}
-	}
-
 	struct EdgeList {
 		std::vector<int> outer_indices;
 		std::vector<std::vector<int> > inner_indices;
@@ -477,7 +382,7 @@ int main (int argc, char** argv)
 			it++;
 			int f1 = *it;
 			double t = std::abs(face_normals[f0].dot(face_normals[f1]));
-			if (t < cos(angle / 180.0 * 3.141592654)) {
+			if (t < cos(camera.GetAngle() / 180.0 * 3.141592654)) {
 				os << "l " << p.first.first + 1 << " " << p.first.second + 1 << "\n";
 			}
 

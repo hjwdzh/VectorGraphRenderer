@@ -35,7 +35,7 @@ void CollectSelfIntersection(Arrangement_2::Ccb_halfedge_circulator curr,
 			valid = false;
 			break;
 		}
-
+		auto f = he->face();
 		auto z_src1 = ComputeDepth(plane_params[id1], he, 1);
 		auto z_src2 = ComputeDepth(plane_params[id2], he, 1);
 		auto z_tar1 = ComputeDepth(plane_params[id1], he, 0);
@@ -48,7 +48,7 @@ void CollectSelfIntersection(Arrangement_2::Ccb_halfedge_circulator curr,
 			split_points.push_back(SplitData(he, diff1, diff2));
 		}
 	} while (++curr != origin);
-	if (!valid) {
+	if (!valid || split_points.size() % 2 == 1) {
 		split_points.resize(current_size);
 	}
 }
@@ -65,6 +65,10 @@ void SortSplitPoint(std::vector<SplitData>* p_split_points) {
 		}
 		if (split_points[j].e->twin()->face() == split_points[j+1].e->twin()->face()) {
 			split_points[j+1].e = split_points[j+1].e->twin();
+		}
+		if (split_points[j].e->twin()->face() != split_points[j+1].e->face()) {
+			printf("Wrong pair!\n");
+			exit(0);
 		}
 	}
 
