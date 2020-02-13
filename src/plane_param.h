@@ -15,7 +15,7 @@ public:
 		const Eigen::Vector3d& v2);
 
 	// make this an inline funcion for fast computation
-	K compute_z(const Point_2& p) const {
+	K ComputeDepth(const Point_2& p) const {
 		if (invalid_)
 			return K(-1e30);
 		return (d_ - p.x() * n1_ - p.y() * n2_) / n3_;

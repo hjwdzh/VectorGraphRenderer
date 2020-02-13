@@ -35,14 +35,6 @@ void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
 
 	auto& out = *pout;
 
-	auto compute_z_dz = [&](int id1, Arrangement_2::Halfedge_handle u, int source = 1) {
-		auto& param = plane_params[id1];
-		auto v_src = u->source();
-		auto v_tar = u->target();
-		auto& p = (source == 1) ? v_src->point() : v_tar->point();
-		return param.compute_z(p);
-	};
-
 	std::vector<std::vector<SplitData> > splits;
 	std::unordered_set<Arrangement_2::Halfedge_handle> halfedges;
 	for (auto e = out.halfedges_begin(); e != out.halfedges_end(); ++e) {
@@ -58,76 +50,15 @@ void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
 		int id2 = fit->data() % seg - 1;
 		if (id1 != -1 && id2 != -1) {
 			std::vector<SplitData> split_points;
-			Arrangement_2::Ccb_halfedge_circulator curr = fit->outer_ccb();
-			int current_size = split_points.size();
-			bool valid = true;
 
-			do {
-				Arrangement_2::Halfedge_handle he = curr;
-				if (halfedges.count(he) == 0) {
-					valid = false;
-					break;
-				}
-				auto z_src1 = compute_z_dz(id1, he, 1);
-				auto z_src2 = compute_z_dz(id2, he, 1);
-				auto z_tar1 = compute_z_dz(id1, he, 0);
-				auto z_tar2 = compute_z_dz(id2, he, 0);
-
-				if ((z_src1 - z_src2) < K(0) && (z_tar1 - z_tar2) > K(0) ||
-					(z_src1 - z_src2) > K(0) && (z_tar1 - z_tar2) < K(0)) {
-					split_points.push_back(SplitData(he, z_src1 - z_src2, z_tar1 - z_tar2));
-				}
-			} while (++curr != fit->outer_ccb());
-			if (!valid) {
-				split_points.resize(current_size);
-			} else {
-				std::sort(split_points.data() + current_size, split_points.data() + split_points.size());
-			}
-
+			CollectSelfIntersection(fit->outer_ccb(), id1, id2, halfedges, plane_params, &split_points);
 			for (auto hi = fit->holes_begin(); hi != fit->holes_end(); ++hi) {
 				auto circ = *hi;
-				Arrangement_2::Halfedge_handle curr = circ;
-				int current_size = split_points.size();
-				bool valid = true;
-				do {
-					Arrangement_2::Halfedge_handle he = curr;
-					if (halfedges.count(he) == 0) {
-						valid = false;
-						break;
-					}
-					auto z_src1 = compute_z_dz(id1, he, 1);
-					auto z_src2 = compute_z_dz(id2, he, 1);
-					auto z_tar1 = compute_z_dz(id1, he, 0);
-					auto z_tar2 = compute_z_dz(id2, he, 0);
-
-					if ((z_src1 - z_src2) < K(0) && (z_tar1 - z_tar2) > K(0) ||
-						(z_src1 - z_src2) > K(0) && (z_tar1 - z_tar2) < K(0)) {
-							split_points.push_back(SplitData(he, z_src1 - z_src2, z_tar1 - z_tar2));
-					}
-				} while (++curr != circ);
-				if (!valid) {
-					split_points.resize(current_size);
-				} else {
-					std::sort(split_points.data() + current_size, split_points.data() + split_points.size());
-				}
+				CollectSelfIntersection(circ, id1, id2, halfedges, plane_params, &split_points);
 			}
 
 			if (split_points.size() != 0) {
-				std::sort(split_points.begin(), split_points.end());
-
-				for (int j = 0; j < split_points.size(); j += 2) {
-					if (split_points[j].e->face() == split_points[j+1].e->face() ||
-						split_points[j].e->face() == split_points[j+1].e->twin()->face()) {
-						split_points[j].e = split_points[j].e->twin();
-					}
-					if (split_points[j].e->twin()->face() == split_points[j+1].e->twin()->face()) {
-						split_points[j+1].e = split_points[j+1].e->twin();
-					}
-				}
-
-				for (int j = 0; j < split_points.size(); j += 2)
-					split_points[j + 1].fid = split_points[j + 1].e->face()->data();
-
+				SortSplitPoint(&split_points);
 				splits.push_back(split_points);
 			}			
 		}
@@ -238,8 +169,8 @@ void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
 			int selected = -1;
 			do {
 				Arrangement_2::Halfedge_handle he = curr;
-				auto z_src1 = compute_z_dz(id1, he, 1);
-				auto z_src2 = compute_z_dz(id2, he, 1);
+				auto z_src1 = ComputeDepth(plane_params[id1], he, 1);
+				auto z_src2 = ComputeDepth(plane_params[id2], he, 1);
 				z_src1 -= z_src2;
 				if (z_src1 < 0) {
 					selected = 0;
@@ -259,4 +190,64 @@ void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
 	}
 
 	MergeFaceInsideArrangement(out);
+}
+
+K ComputeDepth(const PlaneParam& param, Arrangement_2::Halfedge_handle u, int source) {
+	auto v_src = u->source();
+	auto v_tar = u->target();
+	auto& p = (source == 1) ? v_src->point() : v_tar->point();
+	return param.ComputeDepth(p);
+}
+
+void CollectSelfIntersection(Arrangement_2::Ccb_halfedge_circulator curr,
+	int id1, int id2,
+	const std::unordered_set<Arrangement_2::Halfedge_handle>& halfedges,
+	const std::vector<PlaneParam>& plane_params,
+	std::vector<SplitData>* p_split_points) {
+	auto& split_points = *p_split_points;
+	int current_size = split_points.size();
+	bool valid = true;
+	auto origin = curr;
+	do {
+		Arrangement_2::Halfedge_handle he = curr;
+		if (halfedges.count(he) == 0) {
+			valid = false;
+			break;
+		}
+
+		auto z_src1 = ComputeDepth(plane_params[id1], he, 1);
+		auto z_src2 = ComputeDepth(plane_params[id2], he, 1);
+		auto z_tar1 = ComputeDepth(plane_params[id1], he, 0);
+		auto z_tar2 = ComputeDepth(plane_params[id2], he, 0);
+
+		auto diff1 = z_src1 - z_src2;
+		auto diff2 = z_tar1 - z_tar2;
+		if (diff1 < K(0) && diff2 > K(0) ||
+			diff1 > K(0) && diff2 < K(0)) {
+			split_points.push_back(SplitData(he, diff1, diff2));
+		}
+	} while (++curr != origin);
+	if (!valid) {
+		split_points.resize(current_size);
+	}
+}
+
+void SortSplitPoint(std::vector<SplitData>* p_split_points) {
+	auto& split_points = *p_split_points;
+
+	std::sort(split_points.begin(), split_points.end());
+
+	for (int j = 0; j < split_points.size(); j += 2) {
+		if (split_points[j].e->face() == split_points[j+1].e->face() ||
+			split_points[j].e->face() == split_points[j+1].e->twin()->face()) {
+			split_points[j].e = split_points[j].e->twin();
+		}
+		if (split_points[j].e->twin()->face() == split_points[j+1].e->twin()->face()) {
+			split_points[j+1].e = split_points[j+1].e->twin();
+		}
+	}
+
+	for (int j = 0; j < split_points.size(); j += 2)
+		split_points[j + 1].fid = split_points[j + 1].e->face()->data();
+
 }
