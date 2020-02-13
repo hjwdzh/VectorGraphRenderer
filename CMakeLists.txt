@@ -48,6 +48,8 @@ set(
     src/mesh.h
     src/plane_param.cc
     src/plane_param.h
+    src/postprocess.cc
+    src/postprocess.h
     src/split_data.cc
     src/split_data.h
 )

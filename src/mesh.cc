@@ -49,7 +49,8 @@ void Mesh::BoundaryClip(int dim, double clamp_thres, int comp) {
 			v[j] = vertices[faces[i][j]];
 		int valids[3];
 		for (int j = 0; j < 3; ++j) {
-			if (comp == 0 && v[j][dim] < clamp_thres + -1e-6 || comp == 1 && v[j][dim] > clamp_thres + 1e-6) {
+			if ((comp == 0 && v[j][dim] < clamp_thres + -1e-6)
+			 || (comp == 1 && v[j][dim] > clamp_thres + 1e-6)) {
 				valids[j] = 0;
 			} else {
 				valids[j] = 1;

@@ -2,7 +2,6 @@
 #define VECTORGRAPH_RENDERER_CAMERA_H_
 
 #include "mesh.h"
-#include "types.h"
 
 class Camera
 {

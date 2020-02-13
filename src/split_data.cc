@@ -43,8 +43,8 @@ void CollectSelfIntersection(Arrangement_2::Ccb_halfedge_circulator curr,
 
 		auto diff1 = z_src1 - z_src2;
 		auto diff2 = z_tar1 - z_tar2;
-		if (diff1 < K(0) && diff2 > K(0) ||
-			diff1 > K(0) && diff2 < K(0)) {
+		if ((diff1 < K(0) && diff2 > K(0)) ||
+			(diff1 > K(0) && diff2 < K(0))) {
 			split_points.push_back(SplitData(he, diff1, diff2));
 		}
 	} while (++curr != origin);

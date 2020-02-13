@@ -2,7 +2,6 @@
 #define VECTORGRAPH_RENDERER_SCENE_H_
 
 #include "plane_param.h"
-#include "types.h"
 
 class Mesh
 {

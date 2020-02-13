@@ -17,7 +17,7 @@ struct FaceIDPair
 };
 
 typedef CGAL::Exact_rational									K;
-typedef CGAL::Cartesian<K>                   Kernel;
+typedef CGAL::Cartesian<K>                   					Kernel;
 typedef CGAL::Arr_segment_traits_2<Kernel>                      Traits_2;
 typedef Traits_2::Point_2                                       Point_2;
 typedef Traits_2::X_monotone_curve_2                            Segment_2;

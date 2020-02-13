@@ -7,7 +7,8 @@
 
 void ConstructArrangement(const Mesh& mesh,
 	int start, int end, Arrangement_2* overlay) {
-	printf("<%d %d>\n", start, end);
+	printf("\r<%d %d>             ", start, end);
+	fflush(stdout);
 	if (start == end) {
 		ComputeTriangleArrangement(mesh, start, overlay);
 	}
@@ -19,7 +20,8 @@ void ConstructArrangement(const Mesh& mesh,
 		ConstructArrangement(mesh, m + 1, end, &overlay2);
 		MergeArrangement(overlay1, overlay2, mesh, overlay);
 	}
-	printf("finish <%d %d>\n", start, end);
+	printf("\rfinish <%d %d>             ", start, end);
+	fflush(stdout);
 }
 
 void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
