@@ -1,6 +1,7 @@
 #ifndef VECTORGRAPH_RENDER_SPLIT_DATA_H_
 #define VECTORGRAPH_RENDER_SPLIT_DATA_H_
 
+#include "plane_param.h"
 #include "types.h"
 
 struct SplitData
@@ -25,5 +26,17 @@ public:
 		return signature() < n.signature();
 	}
 };
+
+K ComputeDepth(const PlaneParam& plane, Arrangement_2::Halfedge_handle u, int source = 1);
+
+void CollectSelfIntersection(Arrangement_2::Ccb_halfedge_circulator curr,
+	int id1, int id2,
+	const std::unordered_set<Arrangement_2::Halfedge_handle>& halfedges,
+	const std::vector<PlaneParam>& plane_params,
+	std::vector<SplitData>* p_split_points);
+
+void SortSplitPoint(std::vector<SplitData>* p_split_points);
+
+void SubdivideAtIntersection(std::vector<std::vector<SplitData> >& splits, Arrangement_2* pout);
 
 #endif
