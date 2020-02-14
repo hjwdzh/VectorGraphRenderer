@@ -16,8 +16,10 @@ public:
 	void CollectFaceAndVertices(const Arrangement_2& overlay);
 	void RemoveRedundantVertices();
 	void MergeDuplex(const Mesh& mesh);
+	void CollectEdges(const Mesh& mesh);
 
 	void SaveToFile(const Mesh& mesh, double angle_thres, const char* filename);
+	void SaveToSVG(const Mesh& mesh, double angle_thres, const char* filename);
 protected:
 	void RemoveRedundantVerticesFromLoop(std::vector<int>& indices);
 	void ComputeDegree();
@@ -29,6 +31,8 @@ private:
 	std::vector<VertexSignature > points_;
 
 	std::vector<int> degrees_;
+
+	std::map<std::pair<int,int>, std::set<int> > edge2face_;
 };
 
 #endif

@@ -50,6 +50,7 @@ set(
     src/plane_param.h
     src/postprocess.cc
     src/postprocess.h
+    src/simple_svg.h
     src/split_data.cc
     src/split_data.h
 )

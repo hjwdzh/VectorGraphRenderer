@@ -5,6 +5,11 @@
 
 #include <Eigen/Dense>
 
+#include "simple_svg.h"
+
+using namespace svg;
+
+
 void PostProcess::CollectFaceAndVertices(const Arrangement_2& overlay) {
 	auto& points = points_;
 	auto& facets_id = facets_id_;
@@ -173,31 +178,17 @@ void PostProcess::MergeDuplex(const Mesh& mesh)
 	}
 }
 
-void PostProcess::SaveToFile(const Mesh& mesh, double angle_thres, const char* filename) {
+
+void PostProcess::CollectEdges(const Mesh& mesh) {
 	auto & vertices = mesh.GetVertices();
 	auto & faces = mesh.GetFaces();
 	auto & face_normals = mesh.GetFaceNormals();
 	auto & facets_id = facets_id_;
-
-	auto compute_z = [&](int id1, double x, double y) {
-		Eigen::Vector3d v0 = vertices[faces[id1][0]];
-		Eigen::Vector3d v1 = vertices[faces[id1][1]];
-		Eigen::Vector3d v2 = vertices[faces[id1][2]];
-		Eigen::Vector3d norm = (v1 - v0).cross(v2 - v0);
-		if (norm.norm() < 1e-10 || norm[2] == 0) {
-			return (v0.z() + v1.z() + v2.z()) / 3.0;
-		}
-		norm.normalize();
-		double d = v0.dot(norm);
-		//x * norm.x + y * norm.y + z * norm.z = d
-		double z = (d - x * norm[0] - y * norm[1]) / norm[2];
-		return z;
-	};
+	auto & edge2face = edge2face_;
 
 	auto& facets = facets_;
 	auto& points = points_;
 
-	std::map<std::pair<int,int>, std::set<int> > edge2face;
 	for (int i = 0; i < facets.size(); ++i) {
 		for (int j = 0; j < facets[i].outer_indices.size(); ++j) {
 			int v0 = facets[i].outer_indices[j];
@@ -214,6 +205,32 @@ void PostProcess::SaveToFile(const Mesh& mesh, double angle_thres, const char* f
 			}			
 		}
 	}
+}
+
+void PostProcess::SaveToFile(const Mesh& mesh, double angle_thres, const char* filename) {
+	auto & vertices = mesh.GetVertices();
+	auto & faces = mesh.GetFaces();
+	auto & facets = facets_;
+	auto & face_normals = mesh.GetFaceNormals();
+	auto & facets_id = facets_id_;
+	auto & edge2face = edge2face_;
+	auto & points = points_;
+
+	auto compute_z = [&](int id1, double x, double y) {
+		Eigen::Vector3d v0 = vertices[faces[id1][0]];
+		Eigen::Vector3d v1 = vertices[faces[id1][1]];
+		Eigen::Vector3d v2 = vertices[faces[id1][2]];
+		Eigen::Vector3d norm = (v1 - v0).cross(v2 - v0);
+		if (norm.norm() < 1e-10 || norm[2] == 0) {
+			return (v0.z() + v1.z() + v2.z()) / 3.0;
+		}
+		norm.normalize();
+		double d = v0.dot(norm);
+		//x * norm.x + y * norm.y + z * norm.z = d
+		double z = (d - x * norm[0] - y * norm[1]) / norm[2];
+		return z;
+	};
+
 	std::ofstream os;
 
 	os.open(filename);
@@ -268,6 +285,100 @@ void PostProcess::SaveToFile(const Mesh& mesh, double angle_thres, const char* f
 		}
 	}
 	os.close();	
+}
+
+void PostProcess::SaveToSVG(const Mesh& mesh, double angle_thres, const char* filename) {
+    auto & facets = facets_;
+    auto & points = points_;
+    auto & face_normals = mesh.GetFaceNormals();
+    auto & edge2face = edge2face_;
+   	
+   	Dimensions dimensions(1000, 1000);
+    Document doc(filename, Layout(dimensions, Layout::BottomLeft));
+
+    // Red image border.
+    Polygon border(Stroke(1, Color::Red));
+    border << Point(0, 0) << Point(dimensions.width, 0)
+        << Point(dimensions.width, dimensions.height) << Point(0, dimensions.height);
+    doc << border;
+    // Render polygon
+
+	for (auto& i : facets) {
+		if (i.outer_indices.size() < 3)
+			continue;
+
+	    Polygon poly(Color(rand() % 256, rand() % 256, rand() % 256), Stroke(.0, Color(150, 160, 200)));
+
+	    for (auto& e : i.outer_indices) {
+	    	auto& p = points[e].first->point();
+	    	int x = p.x().convert_to<double>() * 1000;
+	    	int y = p.y().convert_to<double>() * 1000;
+	    	poly << Point(x, 1000-y);
+	    }
+	    doc << poly;
+
+		for (auto& es : i.inner_indices) {
+			if (es.size() < 3)
+				continue;
+		    Polygon poly(Color(255,255,255), Stroke(.0, Color(150, 160, 200)));
+			for (auto& e : es) {
+				auto& p = points[e].first->point();
+		    	int x = p.x().convert_to<double>() * 1000;
+		    	int y = p.y().convert_to<double>() * 1000;
+		    	poly << Point(x, 1000-y);
+			}
+			doc << poly;
+		}
+	}
+
+	for (auto& p : edge2face) {
+		if (p.second.size() < 2) {
+		    Polyline poly(Stroke(.5, Color::Blue));
+		    {
+			    auto& p1 = points[p.first.first].first->point();
+		    	int x = p1.x().convert_to<double>() * 1000;
+		    	int y = p1.y().convert_to<double>() * 1000;
+		    	poly << Point(x, 1000-y);
+		    }
+		    {
+			    auto& p1 = points[p.first.second].first->point();
+		    	int x = p1.x().convert_to<double>() * 1000;
+		    	int y = p1.y().convert_to<double>() * 1000;
+		    	poly << Point(x, 1000-y);
+		    }
+		    doc << poly;
+		}
+	}
+
+	for (auto& p : edge2face) {
+		if (p.second.size() >= 2) {
+			auto it = p.second.begin();
+			int f0 = *it;
+			it++;
+			int f1 = *it;
+			double t = std::abs(face_normals[f0].dot(face_normals[f1]));
+			if (t < cos(angle_thres / 180.0 * 3.141592654)) {
+			    Polyline poly(Stroke(.5, Color::Green));
+			    {
+				    auto& p1 = points[p.first.first].first->point();
+			    	int x = p1.x().convert_to<double>() * 1000;
+			    	int y = p1.y().convert_to<double>() * 1000;
+			    	poly << Point(x, 1000-y);
+			    }
+			    {
+				    auto& p1 = points[p.first.second].first->point();
+			    	int x = p1.x().convert_to<double>() * 1000;
+			    	int y = p1.y().convert_to<double>() * 1000;
+			    	poly << Point(x, 1000-y);
+			    }
+			    doc << poly;
+			}
+
+		}
+	}
+
+
+    doc.save();
 }
 
 void PostProcess::ComputeDegree()

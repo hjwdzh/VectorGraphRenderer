@@ -40,7 +40,7 @@ int main (int argc, char** argv)
 
 	ConstructArrangement(mesh, 0, mesh.FaceNum() - 1, &overlay);
 	printf("\n");
-	
+
 	PostProcess process;	
 	process.CollectFaceAndVertices(overlay);
 
@@ -50,6 +50,12 @@ int main (int argc, char** argv)
 	// merge close vertices
 	process.MergeDuplex(mesh);
 
+	process.CollectEdges(mesh);
+
 	//recognize faces
-	process.SaveToFile(mesh, camera.GetAngle(), argv[3]);
+	int l = strlen(argv[3]);
+	if (l > 3 && argv[3][l - 1] == 'g' && argv[3][l - 2] == 'v' && argv[3][l - 3] == 's')
+		process.SaveToSVG(mesh, camera.GetAngle(), argv[3]);
+	else
+		process.SaveToFile(mesh, camera.GetAngle(), argv[3]);
 }
