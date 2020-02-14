@@ -7,6 +7,22 @@
 Mesh::Mesh()
 {}
 
+void Mesh::SaveOBJ(const char* filename, const Camera& camera) {
+	auto& vertices = vertices_;
+	auto& faces = faces_;
+	std::ofstream os(filename);
+	for (int i = 0; i < vertices.size(); ++i) {
+		auto& v = vertices[i];
+		camera.Undistort(v);
+		os << "v " << v[0] << " " << v[1] << " " << v[2] << "\n";
+	}
+	for (int i = 0; i < faces.size(); ++i) {
+		auto& f = faces[i];
+		os << "f " << f[0] + 1 << " " << f[1] + 1 << " " << f[2] + 1 << "\n";
+	}
+	os.close();
+}
+
 void Mesh::LoadFromFile(const char* filename) {
 	auto& vertices = vertices_;
 	auto& faces = faces_;

@@ -2,6 +2,8 @@
 
 #include <fstream>
 
+#include "mesh.h"
+
 Camera::Camera()
 {}
 

@@ -207,7 +207,7 @@ void PostProcess::CollectEdges(const Mesh& mesh) {
 	}
 }
 
-void PostProcess::SaveToFile(const Mesh& mesh, double angle_thres, const char* filename) {
+void PostProcess::SaveToFile(const Mesh& mesh, const Camera& camera, const char* filename) {
 	auto & vertices = mesh.GetVertices();
 	auto & faces = mesh.GetFaces();
 	auto & facets = facets_;

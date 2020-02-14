@@ -2,7 +2,7 @@
 #define VECTORGRAPH_RENDERER_SCENE_H_
 
 #include "plane_param.h"
-
+#include "camera.h"
 class Mesh
 {
 public:
@@ -15,6 +15,8 @@ public:
 	void ComputeNormals();
 
 	void ComputePlaneParameters();
+
+	void SaveOBJ(const char* filename, const Camera& camera);
 
 	int FaceNum() const {
 		return faces_.size();
