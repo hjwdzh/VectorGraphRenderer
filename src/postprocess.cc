@@ -228,12 +228,16 @@ void PostProcess::SaveToFile(const Mesh& mesh, double angle_thres, const char* f
 	}
 
 	for (auto& i : facets) {
+		if (i.outer_indices.size() < 3)
+			continue;
 		os << "f";
 		for (auto& e : i.outer_indices) {
 			os << " " << e + 1;
 		}
 		os << "\n";
 		for (auto& es : i.inner_indices) {
+			if (es.size() < 3)
+				continue;
 			os << "###holes### f";
 			for (auto& e : es) {
 				os << " " << e + 1;
