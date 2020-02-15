@@ -12,6 +12,8 @@ public:
 
 	void BoundaryClip(int dim, double clamp_thres, int comp);
 
+	void Recenter();
+
 	void ComputeNormals();
 
 	void ComputePlaneParameters();

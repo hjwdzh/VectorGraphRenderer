@@ -3,6 +3,7 @@
 SplitData::SplitData()
 {}
 
+/*
 SplitData::SplitData(Arrangement_2::Halfedge_handle _e, K dis1, K dis2) {
 	e = _e;
 
@@ -11,6 +12,11 @@ SplitData::SplitData(Arrangement_2::Halfedge_handle _e, K dis1, K dis2) {
 
 	split_point = Point_2(e->source()->point().x() * ratio1 + e->target()->point().x() * ratio2,
 		e->source()->point().y() * ratio1 + e->target()->point().y() * ratio2);
+}
+*/
+SplitData::SplitData(Arrangement_2::Halfedge_handle _e, const Point_2& p) {
+	e = _e;
+	split_point = p;
 }
 
 K ComputeDepth(const PlaneParam& param, Arrangement_2::Halfedge_handle u, int source) {
@@ -29,25 +35,33 @@ void CollectSelfIntersection(Arrangement_2::Ccb_halfedge_circulator curr,
 	int current_size = split_points.size();
 	bool valid = true;
 	auto origin = curr;
+
+	auto f = curr->face();
+	LineSegment l;
+	
+	plane_params[id1].ProjectiveIntersection(plane_params[id2], &l);
+
 	do {
 		Arrangement_2::Halfedge_handle he = curr;
 		if (halfedges.count(he) == 0) {
 			valid = false;
 			break;
 		}
-		auto f = he->face();
-		auto z_src1 = ComputeDepth(plane_params[id1], he, 1);
-		auto z_src2 = ComputeDepth(plane_params[id2], he, 1);
-		auto z_tar1 = ComputeDepth(plane_params[id1], he, 0);
-		auto z_tar2 = ComputeDepth(plane_params[id2], he, 0);
-
-		auto diff1 = z_src1 - z_src2;
-		auto diff2 = z_tar1 - z_tar2;
-		if ((diff1 < K(0) && diff2 > K(0)) ||
-			(diff1 > K(0) && diff2 < K(0))) {
-			split_points.push_back(SplitData(he, diff1, diff2));
+		//auto pp = he->source()->point();
+		//vs.push_back(Eigen::Vector3d(pp.x().convert_to<double>(), pp.y().convert_to<double>(), 0));
+		Point_2 p;
+		if (l.Intersect(he->source()->point(), he->target()->point(), &p)) {
+			split_points.push_back(SplitData(he, p));
 		}
 	} while (++curr != origin);
+	if (!valid) {
+		split_points.resize(current_size);
+		return;
+	}
+	//if (valid && split_points.size() % 2 == 1) {
+		//printf("HHHH %d %d\n", id1, id2);
+		//exit(0);
+	//}
 	if (!valid || split_points.size() % 2 == 1) {
 		split_points.resize(current_size);
 	}
@@ -65,10 +79,6 @@ void SortSplitPoint(std::vector<SplitData>* p_split_points) {
 		}
 		if (split_points[j].e->twin()->face() == split_points[j+1].e->twin()->face()) {
 			split_points[j+1].e = split_points[j+1].e->twin();
-		}
-		if (split_points[j].e->twin()->face() != split_points[j+1].e->face()) {
-			printf("Wrong pair!\n");
-			exit(0);
 		}
 	}
 

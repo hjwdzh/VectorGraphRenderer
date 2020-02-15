@@ -33,6 +33,8 @@ int main (int argc, char** argv)
 	mesh.BoundaryClip(0, 1, 1);
 	mesh.BoundaryClip(1, 1, 1);
 
+	mesh.Recenter();
+
 	mesh.ComputeNormals();
 	mesh.ComputePlaneParameters();
 
@@ -42,7 +44,7 @@ int main (int argc, char** argv)
 	printf("\n");
 
 	PostProcess process;	
-	process.CollectFaceAndVertices(overlay);
+	process.CollectFaceAndVertices(mesh, overlay);
 
 	// remove 2-degree vertex on edge
 	process.RemoveRedundantVertices();

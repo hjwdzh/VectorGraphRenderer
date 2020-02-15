@@ -40,6 +40,7 @@ void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
 		halfedges.insert(e);
 	}
 
+	int count0 = 0, count1 = 0;
 	for (auto fit = out.faces_begin(); fit != out.faces_end(); ++fit) {
 		if (fit == out.unbounded_face())
 			continue;
@@ -47,7 +48,9 @@ void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
 		seg *= seg;
 		int id1 = fit->data() / seg - 1;
 		int id2 = fit->data() % seg - 1;
+		count0 += 1;
 		if (id1 != -1 && id2 != -1) {
+			count1 += 1;
 			std::vector<SplitData> split_points;
 
 			CollectSelfIntersection((Arrangement_2::Ccb_halfedge_circulator)fit->outer_ccb(), id1, id2, halfedges, plane_params, &split_points);
@@ -72,6 +75,7 @@ void MergeArrangement(const Arrangement_2& arr1, const Arrangement_2& arr2,
 
 void RelabelFaceFromArrangement(const std::vector<PlaneParam>& plane_params, Arrangement_2* pout) {
 	auto& out = *pout;
+	int count = 0;
 	for (auto fit = out.faces_begin(); fit != out.faces_end(); ++fit) {
 		if (fit == out.unbounded_face())
 			continue;
@@ -86,6 +90,7 @@ void RelabelFaceFromArrangement(const std::vector<PlaneParam>& plane_params, Arr
 			fit->set_data((id1 + 1));
 		}
 		else {
+			count += 1;
 			Arrangement_2::Ccb_halfedge_circulator curr = fit->outer_ccb();
 			int selected = -1;
 			do {

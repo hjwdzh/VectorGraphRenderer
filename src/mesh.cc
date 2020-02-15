@@ -26,6 +26,8 @@ void Mesh::SaveOBJ(const char* filename, const Camera& camera) {
 void Mesh::LoadFromFile(const char* filename) {
 	auto& vertices = vertices_;
 	auto& faces = faces_;
+	vertices.clear();
+	faces.clear();
 	char buffer[1024];	
 	std::ifstream is(filename);
 	while (is >> buffer) {
@@ -126,6 +128,14 @@ void Mesh::BoundaryClip(int dim, double clamp_thres, int comp) {
 	}	
 }
 
+void Mesh::Recenter() {
+	auto& vertices = vertices_;
+	for (int i = 0; i < vertices.size(); ++i) {
+		vertices[i][0] -= 0.5;
+		vertices[i][1] -= 0.5;
+	}
+}
+
 void Mesh::ComputeNormals()
 {
 	auto& face_normals = face_normals_;
@@ -151,5 +161,5 @@ void Mesh::ComputePlaneParameters() {
 	params_.resize(faces.size());
 	for (int i = 0; i < faces.size(); ++i) {
 		params[i] = PlaneParam(vertices[faces[i][0]],vertices[faces[i][1]],vertices[faces[i][2]]);
-	}	
+	}
 }

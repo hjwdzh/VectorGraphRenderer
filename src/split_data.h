@@ -8,7 +8,8 @@ struct SplitData
 {
 public:
 	SplitData();
-	SplitData(Arrangement_2::Halfedge_handle _e, K dis1, K dis2);
+	//SplitData(Arrangement_2::Halfedge_handle _e, K dis1, K dis2);
+	SplitData(Arrangement_2::Halfedge_handle _e, const Point_2& p);
 
 	Arrangement_2::Halfedge_handle e;
 	Arrangement_2::Vertex_handle v;

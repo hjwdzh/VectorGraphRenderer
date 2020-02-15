@@ -13,7 +13,7 @@ public:
 		std::vector<std::vector<int> > inner_indices;
 	};
 
-	void CollectFaceAndVertices(const Arrangement_2& overlay);
+	void CollectFaceAndVertices(const Mesh& mesh, const Arrangement_2& overlay);
 	void RemoveRedundantVertices();
 	void MergeDuplex(const Mesh& mesh);
 	void CollectEdges(const Mesh& mesh);
@@ -29,6 +29,7 @@ private:
 
 	std::vector<int> facets_id_;
 	std::vector<VertexSignature > points_;
+	std::vector<K> depths_;
 
 	std::vector<int> degrees_;
 

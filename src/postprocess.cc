@@ -10,11 +10,12 @@
 using namespace svg;
 
 
-void PostProcess::CollectFaceAndVertices(const Arrangement_2& overlay) {
+void PostProcess::CollectFaceAndVertices(const Mesh& mesh, const Arrangement_2& overlay) {
 	auto& points = points_;
 	auto& facets_id = facets_id_;
 	auto& facets = facets_;
-
+	auto& params = mesh.GetPlanes();
+	auto& depths = depths_;
 	std::map<std::pair<Arrangement_2::Vertex_const_handle,int>, int> vertexID;
 
 	for (auto fit = overlay.faces_begin(); fit != overlay.faces_end(); ++fit) {
@@ -33,7 +34,9 @@ void PostProcess::CollectFaceAndVertices(const Arrangement_2& overlay) {
 				vertexID[key] = points.size();
 				e.outer_indices.push_back(points.size());
 
+				K z = params[fid].ComputeDepth(he->source()->point());
 				points.push_back(key);
+				depths.push_back(z);
 			} else {
 				e.outer_indices.push_back(it->second);
 			}
@@ -50,7 +53,11 @@ void PostProcess::CollectFaceAndVertices(const Arrangement_2& overlay) {
 				if (it == vertexID.end()) {
 					vertexID[key] = points.size();
 					e.inner_indices.back().push_back(points.size());
+	
+					K z = params[fid].ComputeDepth(he->source()->point());
 					points.push_back(key);
+					depths.push_back(z);
+	
 				} else {
 					e.inner_indices.back().push_back(it->second);
 				}
@@ -65,6 +72,7 @@ void PostProcess::RemoveRedundantVertices()
 {
 	auto& facets = facets_;
 	auto& points = points_;
+	auto& depths = depths_;
 	auto& degrees = degrees_;
 
 	ComputeDegree();
@@ -86,11 +94,14 @@ void PostProcess::RemoveRedundantVertices()
 	int top = 0;
 	for (int i = 0; i < points.size(); ++i) {
 		if (degrees[i]) {
-			points[top++] = points[i];
+			points[top] = points[i];
+			depths[top] = depths[i];
+			top += 1;
 		}
 	}
 
 	points.resize(top);
+	depths.resize(top);
 	for (auto& i : facets) {
 		for (auto& e : i.outer_indices) {
 			e = compressed_vertexID[e];
@@ -106,23 +117,10 @@ void PostProcess::MergeDuplex(const Mesh& mesh)
 {
 	auto & vertices = mesh.GetVertices();
 	auto & faces = mesh.GetFaces();
-	auto compute_z = [&](int id1, double x, double y) {
-		Eigen::Vector3d v0 = vertices[faces[id1][0]];
-		Eigen::Vector3d v1 = vertices[faces[id1][1]];
-		Eigen::Vector3d v2 = vertices[faces[id1][2]];
-		Eigen::Vector3d norm = (v1 - v0).cross(v2 - v0);
-		if (norm.norm() < 1e-10 || norm[2] == 0) {
-			return (v0.z() + v1.z() + v2.z()) / 3.0;
-		}
-		norm.normalize();
-		double d = v0.dot(norm);
-		//x * norm.x + y * norm.y + z * norm.z = d
-		double z = (d - x * norm[0] - y * norm[1]) / norm[2];
-		return z;
-	};
 
 	auto& facets = facets_;
 	auto& points = points_;
+	auto& depths = depths_;
 	// merge duplex
 	std::map<std::pair<int,std::pair<int,int> >, int> vID;
 	std::vector<int> compressed_vertexID;
@@ -130,22 +128,25 @@ void PostProcess::MergeDuplex(const Mesh& mesh)
 	int top = 0;
 	compressed_vertexID.resize(points.size());
 	std::vector<VertexSignature> points_buf;
+	std::vector<K> depths_buf;
 	for (int i = 0; i < points.size(); ++i) {
 		double x = points[i].first->point().x().convert_to<double>();
 		double y = points[i].first->point().y().convert_to<double>();
-		double z = compute_z(points[i].second, x, y);
+		double z = depths[i].convert_to<double>();
 
 		auto key = std::make_pair(int(x * 1e5), std::make_pair(int(y * 1e5), int(z * 1e5)));
 		auto it = vID.find(key);
 		if (it == vID.end()) {
 			compressed_vertexID[i] = top;
 			points_buf.push_back(points[i]);
+			depths_buf.push_back(depths[i]);
 			vID[key] = top++;
 		} else {
 			compressed_vertexID[i] = it->second;
 		}
 	}
 	points = points_buf;
+	depths = depths_buf;
 
 	auto shrink = [&](std::vector<int>& v) {
 		std::vector<int> m(v.size(), 1);
@@ -207,7 +208,7 @@ void PostProcess::CollectEdges(const Mesh& mesh) {
 	}
 }
 
-void PostProcess::SaveToFile(const Mesh& mesh, const Camera& camera, const char* filename) {
+void PostProcess::SaveToFile(const Mesh& mesh, double angle_thres, const char* filename) {
 	auto & vertices = mesh.GetVertices();
 	auto & faces = mesh.GetFaces();
 	auto & facets = facets_;
@@ -215,21 +216,7 @@ void PostProcess::SaveToFile(const Mesh& mesh, const Camera& camera, const char*
 	auto & facets_id = facets_id_;
 	auto & edge2face = edge2face_;
 	auto & points = points_;
-
-	auto compute_z = [&](int id1, double x, double y) {
-		Eigen::Vector3d v0 = vertices[faces[id1][0]];
-		Eigen::Vector3d v1 = vertices[faces[id1][1]];
-		Eigen::Vector3d v2 = vertices[faces[id1][2]];
-		Eigen::Vector3d norm = (v1 - v0).cross(v2 - v0);
-		if (norm.norm() < 1e-10 || norm[2] == 0) {
-			return (v0.z() + v1.z() + v2.z()) / 3.0;
-		}
-		norm.normalize();
-		double d = v0.dot(norm);
-		//x * norm.x + y * norm.y + z * norm.z = d
-		double z = (d - x * norm[0] - y * norm[1]) / norm[2];
-		return z;
-	};
+	auto & depths = depths_;
 
 	std::ofstream os;
 
@@ -238,9 +225,10 @@ void PostProcess::SaveToFile(const Mesh& mesh, const Camera& camera, const char*
 	for (int i = 0; i < points.size(); ++i) {
 		double x = points[i].first->point().x().convert_to<double>();
 		double y = points[i].first->point().y().convert_to<double>();
-		double z = compute_z(points[i].second, x, y);
+		double z = depths[i].convert_to<double>();
 
-		Eigen::Vector4d v(x - 0.5, y - 0.5, z, 1);
+		Eigen::Vector3d v(x * z, y * z, z);
+		//Eigen::Vector3d v(x, y, z);
 		os << "v " << v[0] << " " << v[1] << " " << v[2] << "\n";
 	}
 
@@ -311,24 +299,25 @@ void PostProcess::SaveToSVG(const Mesh& mesh, double angle_thres, const char* fi
 
 	    for (auto& e : i.outer_indices) {
 	    	auto& p = points[e].first->point();
-	    	int x = p.x().convert_to<double>() * 1000;
-	    	int y = p.y().convert_to<double>() * 1000;
+	    	int x = (p.x().convert_to<double>()+0.5) * 1000;
+	    	int y = (p.y().convert_to<double>()+0.5) * 1000;
 	    	poly << Point(x, 1000-y);
 	    }
 	    doc << poly;
-
+	    /*
 		for (auto& es : i.inner_indices) {
 			if (es.size() < 3)
 				continue;
 		    Polygon poly(Color(255,255,255), Stroke(.0, Color(150, 160, 200)));
 			for (auto& e : es) {
 				auto& p = points[e].first->point();
-		    	int x = p.x().convert_to<double>() * 1000;
-		    	int y = p.y().convert_to<double>() * 1000;
+		    	int x = (p.x().convert_to<double>()+0.5) * 1000;
+		    	int y = (p.y().convert_to<double>()+0.5) * 1000;
 		    	poly << Point(x, 1000-y);
 			}
 			doc << poly;
 		}
+		*/
 	}
 
 	for (auto& p : edge2face) {
@@ -336,14 +325,14 @@ void PostProcess::SaveToSVG(const Mesh& mesh, double angle_thres, const char* fi
 		    Polyline poly(Stroke(.5, Color::Blue));
 		    {
 			    auto& p1 = points[p.first.first].first->point();
-		    	int x = p1.x().convert_to<double>() * 1000;
-		    	int y = p1.y().convert_to<double>() * 1000;
+		    	int x = (p1.x().convert_to<double>()+0.5) * 1000;
+		    	int y = (p1.y().convert_to<double>()+0.5) * 1000;
 		    	poly << Point(x, 1000-y);
 		    }
 		    {
 			    auto& p1 = points[p.first.second].first->point();
-		    	int x = p1.x().convert_to<double>() * 1000;
-		    	int y = p1.y().convert_to<double>() * 1000;
+		    	int x = (p1.x().convert_to<double>()+0.5) * 1000;
+		    	int y = (p1.y().convert_to<double>()+0.5) * 1000;
 		    	poly << Point(x, 1000-y);
 		    }
 		    doc << poly;
@@ -361,14 +350,14 @@ void PostProcess::SaveToSVG(const Mesh& mesh, double angle_thres, const char* fi
 			    Polyline poly(Stroke(.5, Color::Green));
 			    {
 				    auto& p1 = points[p.first.first].first->point();
-			    	int x = p1.x().convert_to<double>() * 1000;
-			    	int y = p1.y().convert_to<double>() * 1000;
+			    	int x = (p1.x().convert_to<double>()+0.5) * 1000;
+			    	int y = (p1.y().convert_to<double>()+0.5) * 1000;
 			    	poly << Point(x, 1000-y);
 			    }
 			    {
 				    auto& p1 = points[p.first.second].first->point();
-			    	int x = p1.x().convert_to<double>() * 1000;
-			    	int y = p1.y().convert_to<double>() * 1000;
+			    	int x = (p1.x().convert_to<double>()+0.5) * 1000;
+			    	int y = (p1.y().convert_to<double>()+0.5) * 1000;
 			    	poly << Point(x, 1000-y);
 			    }
 			    doc << poly;
