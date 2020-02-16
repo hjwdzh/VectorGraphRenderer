@@ -9,8 +9,44 @@
 
 using namespace svg;
 
+int EvaluateEdgeType(Arrangement_2::Halfedge_const_handle he, const Mesh& mesh, const Arrangement_2& overlay, double angle_thres) {
+	int fid = he->face()->data() - 1;
+	auto& params = mesh.GetPlanes();
+	if (he->twin()->face() == overlay.unbounded_face()) {
+		return 2;
+	}
+	else {
+		int fid1 = he->twin()->face()->data() - 1;
+		if (fid1 == -1)
+			return 2;
+		if (fid1 != fid) {
+			K z = params[fid].ComputeDepth(he->source()->point());
+			K n_z = params[fid1].ComputeDepth(he->source()->point());
+			if (std::abs((z-n_z).convert_to<double>()) > 1e-6) {
+				return 2;
+			} else {
+				K z = params[fid].ComputeDepth(he->target()->point());
+				K n_z = params[fid1].ComputeDepth(he->target()->point());
+				if (std::abs((z-n_z).convert_to<double>()) > 1e-6)
+					return 2;
 
-void PostProcess::CollectFaceAndVertices(const Mesh& mesh, const Arrangement_2& overlay) {
+				auto& p1 = mesh.GetPlanes()[fid];
+				auto& p2 = mesh.GetPlanes()[fid1];
+				K dot = p1.n1_ * p2.n1_ + p1.n2_ * p2.n2_ + p1.n3_ * p2.n3_;
+				double t1 = dot.convert_to<double>();
+				double t2 = cos(angle_thres * 3.141592654 / 180.0);
+
+				if (std::abs(t1) < t2) {
+					return 1;
+				}
+			}
+		}
+	}
+
+	return 0;
+}
+
+void PostProcess::CollectFaceAndVertices(const Mesh& mesh, const Arrangement_2& overlay, double angle_thres) {
 	auto& points = points_;
 	auto& facets_id = facets_id_;
 	auto& facets = facets_;
@@ -33,19 +69,20 @@ void PostProcess::CollectFaceAndVertices(const Mesh& mesh, const Arrangement_2& 
 			if (it == vertexID.end()) {
 				vertexID[key] = points.size();
 				e.outer_indices.push_back(points.size());
-
 				K z = params[fid].ComputeDepth(he->source()->point());
 				points.push_back(key);
 				depths.push_back(z);
 			} else {
 				e.outer_indices.push_back(it->second);
 			}
+			e.outer_type.push_back(EvaluateEdgeType(he, mesh, overlay, angle_thres));
 		} while (++curr != e_handle);
 
 		for (auto hi = fit->holes_begin(); hi != fit->holes_end(); ++hi) {
 			auto circ = *hi;
 			Arrangement_2::Ccb_halfedge_const_circulator curr = circ;
 			e.inner_indices.push_back(std::vector<int>());
+			e.inner_type.push_back(std::vector<int>());
 			do {
 				Arrangement_2::Halfedge_const_handle he = curr;
 				auto key = std::make_pair(he->source(), fid);
@@ -53,7 +90,6 @@ void PostProcess::CollectFaceAndVertices(const Mesh& mesh, const Arrangement_2& 
 				if (it == vertexID.end()) {
 					vertexID[key] = points.size();
 					e.inner_indices.back().push_back(points.size());
-	
 					K z = params[fid].ComputeDepth(he->source()->point());
 					points.push_back(key);
 					depths.push_back(z);
@@ -61,6 +97,7 @@ void PostProcess::CollectFaceAndVertices(const Mesh& mesh, const Arrangement_2& 
 				} else {
 					e.inner_indices.back().push_back(it->second);
 				}
+				e.inner_type.back().push_back(EvaluateEdgeType(he, mesh, overlay, angle_thres));
 			} while (++curr != circ);
 		}
 		facets.push_back(e);
@@ -78,9 +115,9 @@ void PostProcess::RemoveRedundantVertices()
 	ComputeDegree();
 
 	for (auto& f : facets) {
-		RemoveRedundantVerticesFromLoop(f.outer_indices);
-		for (auto& es : f.inner_indices) {
-			RemoveRedundantVerticesFromLoop(es);
+		RemoveRedundantVerticesFromLoop(f.outer_indices, f.outer_type);
+		for (int i = 0; i < f.inner_indices.size(); ++i) {
+			RemoveRedundantVerticesFromLoop(f.inner_indices[i], f.inner_type[i]);
 		}
 	}
 
@@ -208,7 +245,7 @@ void PostProcess::CollectEdges(const Mesh& mesh) {
 	}
 }
 
-void PostProcess::SaveToFile(const Mesh& mesh, double angle_thres, const char* filename) {
+void PostProcess::SaveToFile(const Mesh& mesh, const char* filename) {
 	auto & vertices = mesh.GetVertices();
 	auto & faces = mesh.GetFaces();
 	auto & facets = facets_;
@@ -251,31 +288,53 @@ void PostProcess::SaveToFile(const Mesh& mesh, double angle_thres, const char* f
 		}
 	}
 
-	os << "### occlusion boundaries\n";
-	for (auto& p : edge2face) {
-		if (p.second.size() < 2) {
-			os << "l " << p.first.first + 1  << " " << p.first.second + 1 << "\n";
+	for (int i = 0; i < points.size(); ++i) {
+		double x = points[i].first->point().x().convert_to<double>();
+		double y = points[i].first->point().y().convert_to<double>();
+		double z = depths[i].convert_to<double>();
+
+		Eigen::Vector3d v(x * z, y * z, z);
+		//Eigen::Vector3d v(x, y, z);
+		os << "v " << v[0] << " " << v[1] << " " << v[2] << "\n";
+	}
+	os << "### occlude boundaries\n";
+	for (auto& i : facets) {
+		if (i.outer_indices.size() < 3)
+			continue;
+		for (int j = 0; j < i.outer_indices.size(); ++j) {
+			if (i.outer_type[j] == 2) {
+				int next_j = (j + 1) % i.outer_indices.size();
+				os << "l " << i.outer_indices[j] + 1
+				   << " " << i.outer_indices[next_j] + 1 << "\n";
+			}
 		}
 	}
 
-	os << "### sharp edges\n";
-	for (auto& p : edge2face) {
-		if (p.second.size() >= 2) {
-			auto it = p.second.begin();
-			int f0 = *it;
-			it++;
-			int f1 = *it;
-			double t = std::abs(face_normals[f0].dot(face_normals[f1]));
-			if (t < cos(angle_thres / 180.0 * 3.141592654)) {
-				os << "l " << p.first.first + 1 << " " << p.first.second + 1 << "\n";
-			}
+	for (int i = 0; i < points.size(); ++i) {
+		double x = points[i].first->point().x().convert_to<double>();
+		double y = points[i].first->point().y().convert_to<double>();
+		double z = depths[i].convert_to<double>();
 
+		Eigen::Vector3d v(x * z, y * z, z);
+		//Eigen::Vector3d v(x, y, z);
+		os << "v " << v[0] << " " << v[1] << " " << v[2] << "\n";
+	}
+	os << "### sharp edges\n";
+	for (auto& i : facets) {
+		if (i.outer_indices.size() < 3)
+			continue;
+		for (int j = 0; j < i.outer_indices.size(); ++j) {
+			if (i.outer_type[j] == 1) {
+				int next_j = (j + 1) % i.outer_indices.size();
+				os << "l " << i.outer_indices[j] + 1
+				   << " " << i.outer_indices[next_j] + 1 << "\n";
+			}
 		}
 	}
 	os.close();	
 }
 
-void PostProcess::SaveToSVG(const Mesh& mesh, double angle_thres, const char* filename) {
+void PostProcess::SaveToSVG(const Mesh& mesh, const char* filename) {
     auto & facets = facets_;
     auto & points = points_;
     auto & face_normals = mesh.GetFaceNormals();
@@ -295,7 +354,7 @@ void PostProcess::SaveToSVG(const Mesh& mesh, double angle_thres, const char* fi
 		if (i.outer_indices.size() < 3)
 			continue;
 
-	    Polygon poly(Color(rand() % 256, rand() % 256, rand() % 256), Stroke(.0, Color(150, 160, 200)));
+	    Polygon poly(Color(128,128,128), Stroke(.0, Color(150, 160, 200)));
 
 	    for (auto& e : i.outer_indices) {
 	    	auto& p = points[e].first->point();
@@ -304,68 +363,35 @@ void PostProcess::SaveToSVG(const Mesh& mesh, double angle_thres, const char* fi
 	    	poly << Point(x, 1000-y);
 	    }
 	    doc << poly;
-	    /*
-		for (auto& es : i.inner_indices) {
-			if (es.size() < 3)
+	}
+
+	for (int seq = 1; seq <= 2; ++seq) {
+		for (auto& i : facets) {
+			if (i.outer_indices.size() < 3)
 				continue;
-		    Polygon poly(Color(255,255,255), Stroke(.0, Color(150, 160, 200)));
-			for (auto& e : es) {
-				auto& p = points[e].first->point();
-		    	int x = (p.x().convert_to<double>()+0.5) * 1000;
-		    	int y = (p.y().convert_to<double>()+0.5) * 1000;
-		    	poly << Point(x, 1000-y);
-			}
-			doc << poly;
-		}
-		*/
-	}
-
-	for (auto& p : edge2face) {
-		if (p.second.size() < 2) {
-		    Polyline poly(Stroke(.5, Color::Blue));
-		    {
-			    auto& p1 = points[p.first.first].first->point();
-		    	int x = (p1.x().convert_to<double>()+0.5) * 1000;
-		    	int y = (p1.y().convert_to<double>()+0.5) * 1000;
-		    	poly << Point(x, 1000-y);
-		    }
-		    {
-			    auto& p1 = points[p.first.second].first->point();
-		    	int x = (p1.x().convert_to<double>()+0.5) * 1000;
-		    	int y = (p1.y().convert_to<double>()+0.5) * 1000;
-		    	poly << Point(x, 1000-y);
-		    }
-		    doc << poly;
-		}
-	}
-
-	for (auto& p : edge2face) {
-		if (p.second.size() >= 2) {
-			auto it = p.second.begin();
-			int f0 = *it;
-			it++;
-			int f1 = *it;
-			double t = std::abs(face_normals[f0].dot(face_normals[f1]));
-			if (t < cos(angle_thres / 180.0 * 3.141592654)) {
-			    Polyline poly(Stroke(.5, Color::Green));
-			    {
-				    auto& p1 = points[p.first.first].first->point();
-			    	int x = (p1.x().convert_to<double>()+0.5) * 1000;
-			    	int y = (p1.y().convert_to<double>()+0.5) * 1000;
-			    	poly << Point(x, 1000-y);
+			for (int j = 0; j < i.outer_indices.size(); ++j) {
+				if (i.outer_type[j] > 0 && i.outer_type[j] == seq) {
+			    	Polyline poly(Stroke(2, Color::Blue));
+			    	if (i.outer_type[j] == 2)
+			    		poly = Polyline(Stroke(2, Color::Red));
+				    {
+					    auto& p1 = points[i.outer_indices[j]].first->point();
+				    	int x = (p1.x().convert_to<double>()+0.5) * 1000;
+				    	int y = (p1.y().convert_to<double>()+0.5) * 1000;
+				    	poly << Point(x, 1000-y);
+				    }
+				    {
+				    	int next_j = (j + 1) % i.outer_indices.size();
+					    auto& p1 = points[i.outer_indices[next_j]].first->point();
+				    	int x = (p1.x().convert_to<double>()+0.5) * 1000;
+				    	int y = (p1.y().convert_to<double>()+0.5) * 1000;
+				    	poly << Point(x, 1000-y);
+				    }
+				    doc << poly;
 			    }
-			    {
-				    auto& p1 = points[p.first.second].first->point();
-			    	int x = (p1.x().convert_to<double>()+0.5) * 1000;
-			    	int y = (p1.y().convert_to<double>()+0.5) * 1000;
-			    	poly << Point(x, 1000-y);
-			    }
-			    doc << poly;
 			}
-
 		}
 	}
-
 
     doc.save();
 }
@@ -388,13 +414,17 @@ void PostProcess::ComputeDegree()
 	}
 }
 
-void PostProcess::RemoveRedundantVerticesFromLoop(std::vector<int>& indices) {
+void PostProcess::RemoveRedundantVerticesFromLoop(std::vector<int>& indices, std::vector<int>& types) {
 	auto& points = points_;
 	auto& degrees = degrees_;
 
 	std::vector<int> mask(indices.size(), 0);
 	for (int i = 0; i < indices.size(); ++i) {
 		if (degrees[indices[i]] > 2) {
+			mask[i] = 1;
+			continue;
+		}
+		if (types[i] != types[(i + indices.size() - 1) % indices.size()]) {
 			mask[i] = 1;
 			continue;
 		}
@@ -416,9 +446,12 @@ void PostProcess::RemoveRedundantVerticesFromLoop(std::vector<int>& indices) {
 	int top = 0;
 	for (int i = 0; i < indices.size(); ++i) {
 		if (mask[i] == 1) {
-			indices[top++] = indices[i];
+			indices[top] = indices[i];
+			types[top] = types[i];
+			top += 1;
 		}
 	}
 	indices.resize(top);
+	types.resize(top);
 
 }

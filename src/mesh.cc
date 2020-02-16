@@ -170,8 +170,17 @@ void Mesh::ComputeNormals()
 
 	face_normals.resize(faces.size());
 	for (int i = 0; i < faces.size(); ++i) {
-		Eigen::Vector3d d1 = vertices[faces[i][1]] - vertices[faces[i][0]];
-		Eigen::Vector3d d2 = vertices[faces[i][2]] - vertices[faces[i][0]];
+		auto v0 = vertices[faces[i][0]];
+		auto v1 = vertices[faces[i][1]];
+		auto v2 = vertices[faces[i][2]];
+		v0[0] *= v0[2];
+		v0[1] *= v0[2];
+		v1[0] *= v1[2];
+		v1[1] *= v1[2];
+		v2[0] *= v2[2];
+		v2[1] *= v2[2];
+		Eigen::Vector3d d1 = v1 - v0;
+		Eigen::Vector3d d2 = v2 - v0;
 		Eigen::Vector3d n = d1.cross(d2);
 		if (n.norm() > 0)
 			n = n.normalized();
