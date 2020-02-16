@@ -17,6 +17,6 @@ If the output file ends with svg, we produce a svg image file. If the output fil
 
 Example of running the script:
 ```
-./vector_render ../example/AccuCities_HD.obj ../example/matrix.txt result.svg
+./vector_render ../example/sphere.obj ../example/matrix.txt result.svg
 ```
 
