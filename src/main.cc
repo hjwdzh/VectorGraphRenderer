@@ -26,14 +26,14 @@ int main (int argc, char** argv)
 	mesh.LoadFromFile(argv[1]);
 	camera.LoadFromFile(argv[2]);
 	camera.ApplyExtrinsic(mesh);
-	mesh.BoundaryClip(2, 1e-2, 0);
-	camera.ApplyIntrinsic(mesh);
-	mesh.BoundaryClip(0, 0, 0);
-	mesh.BoundaryClip(1, 0, 0);
-	mesh.BoundaryClip(0, 1, 1);
-	mesh.BoundaryClip(1, 1, 1);
 
-	mesh.Recenter();
+	mesh.BoundaryClip(2, 1e-2, 0, false);
+	camera.ApplyIntrinsic(mesh);
+
+	mesh.BoundaryClip(0, -0.5, 0, true);
+	mesh.BoundaryClip(1, -0.5, 0, true);
+	mesh.BoundaryClip(0, 0.5, 1, true);
+	mesh.BoundaryClip(1, 0.5, 1, true);
 
 	mesh.ComputeNormals();
 	mesh.ComputePlaneParameters();

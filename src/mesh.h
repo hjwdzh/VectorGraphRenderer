@@ -10,7 +10,7 @@ public:
 
 	void LoadFromFile(const char* filename);
 
-	void BoundaryClip(int dim, double clamp_thres, int comp);
+	void BoundaryClip(int dim, double clamp_thres, int comp, bool perspective);
 
 	void Recenter();
 
@@ -18,7 +18,7 @@ public:
 
 	void ComputePlaneParameters();
 
-	void SaveOBJ(const char* filename, const Camera& camera);
+	void SaveOBJ(const char* filename, const Camera& camera, bool readjust);
 
 	int FaceNum() const {
 		return faces_.size();

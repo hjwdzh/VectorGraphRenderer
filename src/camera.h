@@ -15,8 +15,8 @@ public:
 		return angle_;
 	}
 	void Undistort(Eigen::Vector3d& v) const {
-		v[0] = (v[0] * width_ - cx_) / fx_ * v[2];
-		v[1] = (v[1] * width_ - cx_) / fx_ * v[2];
+		v[0] = ((v[0]+0.5) * width_ - cx_) / fx_ * v[2];
+		v[1] = ((v[1]+0.5) * height_ - cy_) / fy_ * v[2];
 	}
 private:
 	float fx_, fy_, cx_, cy_;

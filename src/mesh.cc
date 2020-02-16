@@ -7,19 +7,42 @@
 Mesh::Mesh()
 {}
 
-void Mesh::SaveOBJ(const char* filename, const Camera& camera) {
+void Mesh::SaveOBJ(const char* filename, const Camera& camera, bool readjust) {
 	auto& vertices = vertices_;
 	auto& faces = faces_;
 	std::ofstream os(filename);
 	for (int i = 0; i < vertices.size(); ++i) {
-		auto& v = vertices[i];
-		os << "v " << v[0] * v[2] << " " << v[1] * v[2] << " " << v[2] << "\n";
+		auto v = vertices[i];
+		if (readjust)
+			camera.Undistort(v);
+		os << "v " << v[0] << " " << v[1] << " " << v[2] << "\n";
 	}
 	for (int i = 0; i < faces.size(); ++i) {
 		auto& f = faces[i];
 		os << "f " << f[0] + 1 << " " << f[1] + 1 << " " << f[2] + 1 << "\n";
 	}
 	os.close();
+}
+
+Eigen::Vector3d PerspectiveInterp(const Eigen::Vector3d& a, const Eigen::Vector3d& b, double step, bool perspective) {
+	if (!perspective)
+		return a * (1 - step) + b * step;
+	Eigen::Vector3d v0(a[0] * a[2],a[1] * a[2],a[2]);
+	Eigen::Vector3d v1(b[0] * b[2],b[1] * b[2],b[2]);
+	Eigen::Vector3d n1 = (v1 - v0);
+	if (n1.norm() == 0)
+		return a;
+	n1 /= n1.norm();
+
+	Eigen::Vector3d dir1(a[0] * (1 - step) + b[0] * step, a[1] * (1 - step) + b[1] * step, 1);
+	
+	Eigen::Vector3d dir = dir1 - dir1.dot(n1) * n1;
+	
+	double d_norm = dir.squaredNorm();
+	double z = v0.dot(dir) / d_norm;
+
+	dir1[2] = z;
+	return dir1;
 }
 
 void Mesh::LoadFromFile(const char* filename) {
@@ -54,7 +77,7 @@ void Mesh::LoadFromFile(const char* filename) {
 	is.close();
 }
 
-void Mesh::BoundaryClip(int dim, double clamp_thres, int comp) {
+void Mesh::BoundaryClip(int dim, double clamp_thres, int comp, bool perspective) {
 	auto& vertices = vertices_;
 	auto& faces = faces_;
 
@@ -97,8 +120,10 @@ void Mesh::BoundaryClip(int dim, double clamp_thres, int comp) {
 			}
 			int nx = vertices.size();
 			int nx2 = vertices.size() + 1;
-			vertices.push_back(v[j] + step0 * (v[(j+2) % 3] - v[j]));
-			vertices.push_back(v[j] + step1 * (v[(j+1) % 3] - v[j]));
+
+			vertices.push_back(PerspectiveInterp(v[j], v[(j+2)%3], step0, perspective));
+			vertices.push_back(PerspectiveInterp(v[j], v[(j+1)%3], step1, perspective));
+
 			faces[i] = Eigen::Vector3i(nx, faces[i][j], nx2);
 		}
 		else {
@@ -118,8 +143,10 @@ void Mesh::BoundaryClip(int dim, double clamp_thres, int comp) {
 			int nx = vertices.size();
 			int nx2 = vertices.size() + 1;
 			int v1 = faces[i][(j + 1) % 3];
-			vertices.push_back(v[j] + step0 * (v[(j+2) % 3] - v[j]));
-			vertices.push_back(v[j] + step1 * (v[(j+1) % 3] - v[j]));
+
+			vertices.push_back(PerspectiveInterp(v[j], v[(j+2)%3], step0, perspective));
+			vertices.push_back(PerspectiveInterp(v[j], v[(j+1)%3], step1, perspective));
+
 			faces[i] = Eigen::Vector3i(v0, nx, nx2);
 			faces.push_back(Eigen::Vector3i(v0, nx2, v1));
 		}

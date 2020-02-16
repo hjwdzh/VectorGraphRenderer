@@ -38,8 +38,8 @@ void Camera::ApplyIntrinsic(Mesh& mesh) {
 	for (int i = 0; i < vertices.size(); ++i) {
 		Eigen::Vector3d v = vertices[i];
 		if (v[2] != 0) {
-			vertices[i] = Eigen::Vector3d((v[0]/v[2]*fx_+cx_)/width_,
-				(v[1]/v[2]*fy_+cy_)/height_,v[2]);
+			vertices[i] = Eigen::Vector3d((v[0]/v[2]*fx_+cx_)/width_ - 0.5,
+				(v[1]/v[2]*fy_+cy_)/height_-0.5,v[2]);
 		} else {
 			vertices[i] = Eigen::Vector3d(0, 0, 0);
 		}
