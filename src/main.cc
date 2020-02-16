@@ -35,6 +35,9 @@ int main (int argc, char** argv)
 
 	mesh.Recenter();
 
+	mesh.SaveOBJ("debug.obj", camera);
+	exit(0);
+
 	mesh.ComputeNormals();
 	mesh.ComputePlaneParameters();
 
