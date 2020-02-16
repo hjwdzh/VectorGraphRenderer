@@ -38,6 +38,8 @@ set(
     VectorRender_SRC
     src/main.cc
     src/types.h
+    src/plane_param.cc
+    src/plane_param.h
 )
 
 add_executable(

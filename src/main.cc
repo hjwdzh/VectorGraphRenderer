@@ -12,42 +12,7 @@
 #include <unordered_set>
 #include <chrono>
 
-#include "types.h"
-
-#define THRES 1e-10
-inline bool equal(double a, double b) {
-	return std::abs(a - b) < THRES;
-}
-inline bool smaller(double a, double b) {
-	return a + THRES < b;
-}
-
-struct PlaneParam
-{
-	PlaneParam(){}
-	PlaneParam(const Eigen::Vector3d& v0,
-		const Eigen::Vector3d& v1,
-		const Eigen::Vector3d& v2) {
-		Eigen::Vector3d norm = (v1 - v0).cross(v2 - v0);
-		if (norm.norm() < THRES || norm[2] == 0) {
-			invalid = true;
-		}
-		norm.normalize();
-		d = v0.dot(norm);
-		n1 = norm[0];
-		n2 = norm[1];
-		n3 = norm[2];
-		invalid = false;
-	}
-
-	K compute_z(const Point_2& p) const {
-		if (invalid)
-			return K(-1e30);
-		return (d - p.x() * n1 - p.y() * n2) / n3;
-	}
-	bool invalid;
-	K n1, n2, n3, d;
-};
+#include "plane_param.h"
 
 struct SplitData
 {
@@ -743,7 +708,7 @@ int main (int argc, char** argv)
 		Eigen::Vector3d v1 = vertices[faces[id1][1]];
 		Eigen::Vector3d v2 = vertices[faces[id1][2]];
 		Eigen::Vector3d norm = (v1 - v0).cross(v2 - v0);
-		if (norm.norm() < THRES || norm[2] == 0) {
+		if (norm.norm() < 1e-10 || norm[2] == 0) {
 			return (v0.z() + v1.z() + v2.z()) / 3.0;
 		}
 		norm.normalize();
